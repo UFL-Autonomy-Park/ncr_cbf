@@ -1,0 +1,61 @@
+ncr_cbf_node:
+  ros__parameters:
+    robot_names: [bebop104, rosbot05, rosbot10, bebop110]
+
+    room_geometry:
+      x_min: -2.5
+      x_max: 2.5
+      y_min: 0.0
+      y_max: 2.5
+      z_min: -7.0
+      z_max: 7.0
+
+    robots:
+      bebop104:
+        radius: 0.25
+        room_constraints:
+          enabled: true
+          kappa: 2.0
+        saturation_constraints:
+          enabled: true
+          componentwise_vel_bound: [0.5, 0.5, 0.5]
+
+      rosbot05:
+        radius: 0.1
+        room_constraints:
+          enabled: true
+          kappa: 1.0
+        saturation_constraints:
+          enabled: true
+          componentwise_vel_bound: [0.8, 0.8, 0.8]
+
+      rosbot10:
+        radius: 0.1
+        room_constraints:
+          enabled: true
+          kappa: 1.0
+        saturation_constraints:
+          enabled: true
+          componentwise_vel_bound: [0.8, 0.8, 0.8]
+
+      bebop110:
+        radius: 0.25
+        room_constraints:
+          enabled: true
+          kappa: 2.0
+        saturation_constraints:
+          enabled: true
+          componentwise_vel_bound: [0.5, 0.5, 0.5]
+
+    robot_pair_names: [bebop104_bebop110, rosbot05_rosbot10]
+
+    robot_pairs:
+      bebop104_bebop110:
+        robots: [bebop104, bebop110]
+        kappa: 2.0
+        safety_buffer: 0.2
+
+      rosbot05_rosbot10:
+        robots: [rosbot05, rosbot10]
+        kappa: 1.0
+        safety_buffer: 0.1
