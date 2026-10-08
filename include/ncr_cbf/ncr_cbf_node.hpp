@@ -9,6 +9,7 @@ class NcrCbfNode : public rclcpp::Node
     private:
         // populate with parameters
         std::vector<std::string> robot_names;
+        std::vector<std::string> robot_pair_names;
         std::map<
             std::string,std::size_t
         > robot_index_lookup;
@@ -21,11 +22,6 @@ class NcrCbfNode : public rclcpp::Node
             std::size_t, double
         > robot_radii;
         std::map<
-            std::pair<
-                std::size_t, std::size_t
-            >, double
-        > safety_buffers;
-        std::map<
             std::size_t, double
         > room_kappas;
         std::map<
@@ -34,8 +30,19 @@ class NcrCbfNode : public rclcpp::Node
             >, double
         > pairwise_kappas;
         std::map<
+            std::pair<
+                std::size_t, std::size_t
+            >, double
+        > pairwise_safety_buffers;
+        std::map<
             std::size_t,Eigen::Vector3d
         > componentwise_vel_bounds;
 
-        void load_parameters(std::string robot_name, std::size_t robot_idx);
+        bool check_if_duplicates(std::vector<std::string> input_vector);
+
+        void load_individual_parameters(std::string robot_name, std::size_t robot_idx);
+
+        void load_pairwise_parameters(std::string robot_pair_name, std::pair<
+            std::size_t, std::size_t
+        > pair_idxs);
 };
