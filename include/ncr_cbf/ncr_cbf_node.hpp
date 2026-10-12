@@ -39,10 +39,9 @@ class NcrCbfNode : public rclcpp::Node
         > componentwise_vel_bounds;
 
         bool check_if_duplicates(std::vector<std::string> input_vector);
+        void check_pair_formatting(std::string input_pair);
 
         void load_individual_parameters(std::string robot_name, std::size_t robot_idx);
 
-        void load_pairwise_parameters(std::string robot_pair_name, std::pair<
-            std::size_t, std::size_t
-        > pair_idxs);
+        void load_pairwise_parameters(std::string robot_pair_name);
 };
