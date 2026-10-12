@@ -1,5 +1,7 @@
 ncr_cbf_node:
   ros__parameters:
+    location: "indoor_lab"
+
     robot_names: [bebop104, rosbot05, rosbot10, bebop110]
 
     room_geometry:
@@ -12,6 +14,9 @@ ncr_cbf_node:
 
     robots:
       bebop104:
+        pose_topic: "/vrpn_mocap/bebop104/pose"
+        unsafe_control_input_topic: "/bebop104/cmd_vel_des_unsafe"
+        safe_control_input_topic: "/bebop104/cmd_vel_des"
         radius: 0.25
         room_constraints:
           enabled: true
@@ -21,6 +26,9 @@ ncr_cbf_node:
           componentwise_vel_bound: [0.5, 0.5, 0.5]
 
       rosbot05:
+        pose_topic: "/vrpn_mocap/rosbot05/pose"
+        unsafe_control_input_topic: "/rosbot05/cmd_vel_unsafe"
+        safe_control_input_topic: "/rosbot05/cmd_vel"
         radius: 0.1
         room_constraints:
           enabled: true
@@ -30,6 +38,9 @@ ncr_cbf_node:
           componentwise_vel_bound: [0.8, 0.8, 0.8]
 
       rosbot10:
+        pose_topic: "/vrpn_mocap/rosbot10/pose"
+        unsafe_control_input_topic: "/rosbot10/cmd_vel_unsafe"
+        safe_control_input_topic: "/rosbot10/cmd_vel_unsafe"
         radius: 0.1
         room_constraints:
           enabled: true
@@ -39,6 +50,9 @@ ncr_cbf_node:
           componentwise_vel_bound: [0.8, 0.8, 0.8]
 
       bebop110:
+        pose_topic: "/vrpn_mocap/bebop110/pose"
+        unsafe_control_input_topic: "/bebop110/cmd_vel_des_unsafe"
+        safe_control_input_topic: "/bebop110/cmd_vel_des"
         radius: 0.25
         room_constraints:
           enabled: true
