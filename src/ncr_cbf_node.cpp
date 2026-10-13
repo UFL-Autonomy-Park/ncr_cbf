@@ -197,6 +197,16 @@ void NcrCbfNode::load_individual_parameters(std::string robot_name, std::size_t 
     // using name and index, append values to each parameter map
     const std::string prefix = "robots." + robot_name + ".";
 
+    // radius
+    const std::string radius_string = prefix + ".radius";
+    this->declare_parameter(radius_string, rclcpp::ParameterType::PARAMETER_DOUBLE);
+    double robot_radius;
+    if (!this->get_parameter(radius_string, robot_radius))
+    {
+        throw std::invalid_argument("Parameter " + radius_string + " undefined or invalid\n");
+    }
+    robot_radii.emplace(robot_idx, robot_radius);
+
     // room constraints
     bool room_bool{false};
     const std::string room_string = prefix + "room_constraints";

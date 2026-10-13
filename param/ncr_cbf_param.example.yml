@@ -15,8 +15,8 @@ ncr_cbf_node:
     robots:
       bebop104:
         pose_topic: "/vrpn_mocap/bebop104/pose"
-        unsafe_control_input_topic: "/bebop104/cmd_vel_des_unsafe"
-        safe_control_input_topic: "/bebop104/cmd_vel_des"
+        unsafe_cmd_vel_topic: "/bebop104/cmd_vel_des_unsafe"
+        safe_cmd_vel_topic: "/bebop104/cmd_vel_des"
         radius: 0.25
         room_constraints:
           enabled: true
@@ -27,8 +27,8 @@ ncr_cbf_node:
 
       rosbot05:
         pose_topic: "/vrpn_mocap/rosbot05/pose"
-        unsafe_control_input_topic: "/rosbot05/cmd_vel_unsafe"
-        safe_control_input_topic: "/rosbot05/cmd_vel"
+        unsafe_cmd_vel_topic: "/rosbot05/cmd_vel_unsafe"
+        safe_cmd_vel_topic: "/rosbot05/cmd_vel"
         radius: 0.1
         room_constraints:
           enabled: true
@@ -39,8 +39,8 @@ ncr_cbf_node:
 
       rosbot10:
         pose_topic: "/vrpn_mocap/rosbot10/pose"
-        unsafe_control_input_topic: "/rosbot10/cmd_vel_unsafe"
-        safe_control_input_topic: "/rosbot10/cmd_vel_unsafe"
+        unsafe_cmd_vel_topic: "/rosbot10/cmd_vel_unsafe"
+        safe_cmd_vel_topic: "/rosbot10/cmd_vel"
         radius: 0.1
         room_constraints:
           enabled: true
@@ -51,8 +51,8 @@ ncr_cbf_node:
 
       bebop110:
         pose_topic: "/vrpn_mocap/bebop110/pose"
-        unsafe_control_input_topic: "/bebop110/cmd_vel_des_unsafe"
-        safe_control_input_topic: "/bebop110/cmd_vel_des"
+        unsafe_cmd_vel_topic: "/bebop110/cmd_vel_des_unsafe"
+        safe_cmd_vel_topic: "/bebop110/cmd_vel_des"
         radius: 0.25
         room_constraints:
           enabled: true

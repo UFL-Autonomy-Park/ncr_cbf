@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <Eigen/Core>
 
 #include <ncr_cbf/types.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -61,10 +62,18 @@ private:
     // utils
     bool check_if_duplicates(std::vector<std::string> input_vector);
     void check_pair_formatting(std::string input_pair);
+    void publish_zeros(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr safe_cmd_vel_pub);
 
     // parameters
     void load_individual_parameters(std::string robot_name, std::size_t robot_idx);
     void load_pairwise_parameters(std::string robot_pair_name);
+
+    // variable storage
+    std::map<std::string, rclcpp::Time> pose_stamps;
+    std::map<std::string, rclcpp::Time> unsafe_cmd_vel_stamps;
+    std::map<std::string, Eigen::Vector3d> positions;
+    std::map<std::string, Eigen::Vector3d> unsafe_cmd_vels;
+    std::map<std::string, Eigen::Vector3d> safe_cmd_vels;
 
     // callbacks
     void pose_callback(std::string robot_name, const geometry_msgs::msg::PoseStamped msg);
