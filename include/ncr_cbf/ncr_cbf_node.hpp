@@ -52,11 +52,11 @@ private:
         componentwise_vel_bounds;
 
     // subscribers
-    std::map<std::string, rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr> pose_subs;     // agent pose
-    std::map<std::string, rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr> control_subs; // unsafe control input
+    std::map<std::string, rclcpp::Subscription<geometry_msgs::msg::PoseStamped>::SharedPtr> pose_subs;            // agent pose
+    std::map<std::string, rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr> unsafe_cmd_vel_subs; // unsafe control input
 
     // publishers
-    std::map<std::string, rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr> control_pubs; // safe control input
+    std::map<std::string, rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr> safe_cmd_vel_pubs; // safe control input
 
     // utils
     bool check_if_duplicates(std::vector<std::string> input_vector);
@@ -68,4 +68,5 @@ private:
 
     // callbacks
     void pose_callback(std::string robot_name, const geometry_msgs::msg::PoseStamped msg);
+    void unsafe_cmd_vel_callback(std::string robot_name, const geometry_msgs::msg::TwistStamped msg);
 };

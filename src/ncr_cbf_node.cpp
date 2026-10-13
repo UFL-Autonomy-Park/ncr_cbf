@@ -3,6 +3,8 @@
 #include <stdexcept>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
+#include "geometry_msgs/msg/twist_stamped.hpp"
+#include "geometry_msgs/msg/twist.hpp"
 
 NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
 {
@@ -30,7 +32,7 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     this->get_parameter("room_geometry.z_min", room_geometry.z_min);
     this->get_parameter("room_geometry.z_max", room_geometry.z_max);
 
-    if (location != "indoor_lab" || location != "autonomy_park")
+    if (location != "indoor_lab" && location != "autonomy_park")
     {
         throw std::invalid_argument("Location must be `indoor_lab` or `autonomy_park\n`");
     }
@@ -71,22 +73,45 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
 
     // TO-DO: construct global constraints
 
-    // TO-DO: subscribers
+    // subscribers
     for (const auto &robot_name : robot_names)
     {
         // pose
-        std::string sub_topic;
+        std::string pose_topic;
         this->declare_parameter("robots." + robot_name + ".pose_topic", rclcpp::ParameterType::PARAMETER_STRING);
-        if (!this->get_parameter("robots." + robot_name + ".pose_topic", sub_topic))
+        if (!this->get_parameter("robots." + robot_name + ".pose_topic", pose_topic))
         {
             throw std::invalid_argument("Parameter robots." + robot_name + ".pose_topic" + " undefined or invalid\n");
         }
-        // pose_subs[robot_name] = create_subscription<geometry_msgs::msg::PoseStamped>(sub_topic, 10, ); // YOU ARE HERE
+        pose_subs[robot_name] = create_subscription<geometry_msgs::msg::PoseStamped>(
+            pose_topic, 10, [this, robot_name](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
+            { pose_callback(robot_name, *msg); });
 
         // unsafe cmd_vel
+        std::string unsafe_cmd_vel_topic;
+        this->declare_parameter("robots." + robot_name + ".unsafe_cmd_vel_topic", rclcpp::ParameterType::PARAMETER_STRING);
+        if (!this->get_parameter("robots." + robot_name + ".unsafe_cmd_vel_topic", unsafe_cmd_vel_topic))
+        {
+            throw std::invalid_argument("Parameter robots." + robot_name + ".unsafe_cmd_vel_topic" + " undefined or invalid\n");
+        }
+        unsafe_cmd_vel_subs[robot_name] = create_subscription<geometry_msgs::msg::TwistStamped>(
+            unsafe_cmd_vel_topic, 10, [this, robot_name](geometry_msgs::msg::TwistStamped::ConstSharedPtr msg)
+            { unsafe_cmd_vel_callback(robot_name, *msg); });
     }
 
-    // TO-DO: publishers
+    // publishers
+    for (const auto &robot_name : robot_names)
+    {
+        // safe_cmd_vel
+        std::string safe_cmd_vel_topic;
+        this->declare_parameter("robots." + robot_name + ".safe_cmd_vel_topic", rclcpp::ParameterType::PARAMETER_STRING);
+        if (!this->get_parameter("robots." + robot_name + ".safe_cmd_vel_topic", safe_cmd_vel_topic))
+        {
+            throw std::invalid_argument("Parameter robots." + robot_name + ".safe_cmd_vel_topic" + " undefined or invalid\n");
+        }
+        safe_cmd_vel_pubs[robot_name] = create_publisher<geometry_msgs::msg::Twist>(
+            safe_cmd_vel_topic, 10);
+    }
 
     // TO-DO: variable storage
     // vars for timeouts. timeouts should include stale pose data, stale control input data, and stale solved cbf data
