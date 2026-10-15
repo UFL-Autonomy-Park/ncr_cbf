@@ -1,6 +1,8 @@
 #include <ncr_cbf/ncr_cbf_node.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <stdexcept>
+#include <Eigen/Core>
+#include <Eigen/Geometry>
 
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
@@ -13,6 +15,8 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     // declare global parameters
     this->declare_parameter("location", rclcpp::ParameterType::PARAMETER_STRING);
     this->declare_parameter("robot_names", rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
+    this->declare_parameter("pose_timout", rclcpp::ParameterType::PARAMETER_DOUBLE);
+    this->declare_parameter("cmd_vel_timeout_sec", rclcpp::ParameterType::PARAMETER_DOUBLE);
     this->declare_parameter("robot_pair_names", rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
     this->declare_parameter("room_geometry.x_min", rclcpp::ParameterType::PARAMETER_DOUBLE);
     this->declare_parameter("room_geometry.x_max", rclcpp::ParameterType::PARAMETER_DOUBLE);
@@ -24,6 +28,8 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     // get global parameters
     this->get_parameter("location", location);
     this->get_parameter("robot_names", robot_names);
+    this->get_parameter("pose_timeout_sec", pose_timeout_sec);
+    this->get_parameter("cmd_vel_timeout_sec", cmd_vel_timeout_sec);
     this->get_parameter("robot_pair_names", robot_pair_names);
     this->get_parameter("room_geometry.x_min", room_geometry.x_min);
     this->get_parameter("room_geometry.x_max", room_geometry.x_max);
@@ -31,6 +37,13 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     this->get_parameter("room_geometry.y_max", room_geometry.y_max);
     this->get_parameter("room_geometry.z_min", room_geometry.z_min);
     this->get_parameter("room_geometry.z_max", room_geometry.z_max);
+
+    // init checks
+    init_pose_checked_ = false;
+    for (auto name : robot_names)
+    {
+        poses_recieved_.emplace(name, false);
+    }
 
     if (location != "indoor_lab" && location != "autonomy_park")
     {
@@ -70,8 +83,6 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
         load_pairwise_parameters(pair);
     }
     RCLCPP_INFO(this->get_logger(), "Pairwise parameters loaded successfully");
-
-    // TO-DO: construct global constraints
 
     // subscribers
     for (const auto &robot_name : robot_names)
@@ -118,7 +129,11 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     // need to think about architecture here
     // pose data comes
     // control data should go out on timer and return zeros in any situation where it would be unsafe or the data has not completely populated (i.e., no active desired control input for agents or mocap times out)
+    // TODO: Add a per-robot convert_to_body_frame bool in the parameter file; in the timer callback loop, convert the safe velocity to the body frame before publishing when enabled.
     // should also consider how the bebop modes are handled
+
+    // TO:DO: initialization
+    // need to make sure that all robots are not violating constraints on boot
 }
 
 bool NcrCbfNode::check_if_duplicates(std::vector<std::string> input_vector)
@@ -300,4 +315,162 @@ void NcrCbfNode::load_pairwise_parameters(std::string robot_pair_name)
         throw std::invalid_argument("Parameter " + prefix + "safety_buffer" + " undefined or invalid\n");
     }
     pairwise_safety_buffers.emplace(robot_pair_idxs, pairwise_safety_buffer);
+}
+
+void NcrCbfNode::publish_zeros(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr safe_cmd_vel_pub)
+{
+    geometry_msgs::msg::Twist zero_twist;
+    zero_twist.linear.x = 0.0;
+    zero_twist.linear.y = 0.0;
+    zero_twist.linear.z = 0.0;
+    zero_twist.angular.x = 0.0;
+    zero_twist.angular.y = 0.0;
+    zero_twist.angular.z = 0.0;
+
+    safe_cmd_vel_pub->publish(zero_twist);
+}
+
+Eigen::Vector3d convert_to_body_frame(Eigen::Quaterniond quaternion, Eigen::Vector3d world_frame_vel)
+{
+    quaternion.normalize();
+    Eigen::Vector3d body_frame_vel = quaternion.inverse() * world_frame_vel;
+    return body_frame_vel;
+}
+
+void NcrCbfNode::cbf_loop()
+{
+    // init checks
+    if (!all_init_poses_recieved_ || !all_init_unsafe_cmd_vels_recieved_)
+    {
+        // check if each pose has been receieved
+        if (!all_init_poses_recieved_)
+        {
+            bool pose_candidate = true;
+            for (auto robot_name : robot_names)
+            {
+                if (poses_recieved_[robot_name] == false)
+                {
+                    pose_candidate = false;
+                }
+            }
+            all_init_poses_recieved_ = pose_candidate;
+        }
+
+        // check if each cmd_vel has been recieved
+        if (!all_init_unsafe_cmd_vels_recieved_)
+        {
+            bool cmd_vel_candidate = true;
+            for (auto robot_name : robot_names)
+            {
+                if (unsafe_cmd_vels_recieved_[robot_name] == false)
+                {
+                    cmd_vel_candidate = false;
+                }
+            }
+            all_init_unsafe_cmd_vels_recieved_ = cmd_vel_candidate;
+        }
+
+        // publish zeros to all and return
+        for (auto robot_name : robot_pair_names)
+        {
+            publish_zeros(safe_cmd_vel_pubs[robot_name]);
+        }
+        return;
+    }
+    if (!init_pose_checked_)
+    {
+        // room constraints
+        for (auto robot_name : robot_names)
+        {
+            bool room_bool = false;
+            this->get_parameter("robots." + robot_name + ".room_constraints.enabled", room_bool);
+            if (room_bool)
+            {
+                bool room_check = true;
+                if (positions_[robot_name][0] >= room_geometry.x_max || positions_[robot_name][0] <= room_geometry.x_min)
+                {
+                    room_check = false;
+                }
+                if (positions_[robot_name][1] >= room_geometry.y_max || positions_[robot_name][1] <= room_geometry.y_min)
+                {
+                    room_check = false;
+                }
+                if (positions_[robot_name][2] >= room_geometry.z_max || positions_[robot_name][2] <= room_geometry.z_min)
+                {
+                    room_check = false;
+                }
+                if (!room_check)
+                {
+                    RCLCPP_FATAL(this->get_logger(), "Room constraints violated on initialization for %s", robot_name.c_str());
+                    throw std::runtime_error("Room constraints violated on initialization for " + robot_name);
+                }
+            }
+        }
+
+        // pairwise constraints
+        for (auto robot_pair_name : robot_pair_names)
+        {
+            // split at underscore
+            std::size_t underscore_idx = robot_pair_name.find('_');
+            std::string robot_1 = robot_pair_name.substr(0, underscore_idx);
+            std::string robot_2 = robot_pair_name.substr(underscore_idx + 1);
+            std::size_t robot_1_idx = robot_index_lookup[robot_1];
+            std::size_t robot_2_idx = robot_index_lookup[robot_2];
+
+            // compute distance between robots and check if it is smaller than sum of individual radii
+            double robot_1_radius = robot_radii[robot_1_idx];
+            double robot_2_radius = robot_radii[robot_2_idx];
+            double distance = (positions_[robot_1] - positions_[robot_2]).norm();
+            if (distance <= robot_1_radius + robot_2_radius)
+            {
+                RCLCPP_FATAL(this->get_logger(), "Pairwise constraints violated on initialization for %s", robot_pair_name.c_str());
+                throw std::runtime_error("Pairwise constraints violated on initialization for " + robot_pair_name);
+            }
+        }
+
+        // publish zeros to all and return
+        for (auto robot_name : robot_pair_names)
+        {
+            publish_zeros(safe_cmd_vel_pubs[robot_name]);
+        }
+        return;
+    }
+
+    if (init_pose_checked_)
+    {
+        // timeouts first
+
+        // construct global constraints
+
+        // run cbf and ensure no solver errors
+
+        // check if convert_to_body_frame and publish safe cmd_vel
+    }
+}
+
+// callbacks
+void NcrCbfNode::pose_callback(std::string robot_name, const geometry_msgs::msg::PoseStamped &msg)
+{
+    if (!all_init_poses_recieved_)
+    {
+        poses_recieved_.insert_or_assign(robot_name, true);
+    }
+    rclcpp::Time last_pose_time = this->now();
+    pose_time_stamps_.insert_or_assign(robot_name, last_pose_time);
+    Eigen::Vector3d agent_position(
+        msg.pose.position.x,
+        msg.pose.position.y,
+        msg.pose.orientation.z);
+    positions_.insert_or_assign(robot_name, agent_position);
+}
+
+void NcrCbfNode::unsafe_cmd_vel_callback(std::string robot_name, const geometry_msgs::msg::TwistStamped &msg)
+{
+    rclcpp::Time last_cmd_vel_time = this->now();
+    unsafe_cmd_vel_time_stamps_.insert_or_assign(robot_name, last_cmd_vel_time);
+    Eigen::Vector3d agent_unsafe_cmd_vel(
+        msg.twist.linear.x,
+        msg.twist.linear.y,
+        msg.twist.linear.z);
+    unsafe_cmd_vels_.insert_or_assign(robot_name, agent_unsafe_cmd_vel);
 }
