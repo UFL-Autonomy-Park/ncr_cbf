@@ -24,6 +24,7 @@ private:
     // populate with parameters
     std::string location;
     std::vector<std::string> robot_names;
+    int cbf_rate_hz;
     double pose_timeout_sec;
     double cmd_vel_timeout_sec;
     std::vector<std::string> robot_pair_names;
@@ -35,6 +36,9 @@ private:
     std::vector<std::size_t> room_agents;
     std::vector<std::size_t> saturation_agents;
     std::vector<std::pair<std::size_t, std::size_t>> pairwise_pairs;
+    std::map<
+        std::size_t, bool>
+        convert_to_body_frame_bools;
     std::map<
         std::size_t, double>
         robot_radii;
@@ -82,11 +86,13 @@ private:
     std::map<std::string, Eigen::Vector3d> positions_;
     std::map<std::string, bool> unsafe_cmd_vels_recieved_;
     std::map<std::string, rclcpp::Time> unsafe_cmd_vel_time_stamps_;
-    std::map<std::string, Eigen::Vector3d> unsafe_cmd_vels_;
+    std::map<std::string, Eigen::Vector3d> unsafe_linear_cmd_vels_;
+    std::map<std::string, Eigen::Vector3d> unsafe_angular_cmd_vels_;
     std::map<std::string, Eigen::Vector3d> safe_cmd_vels_;
     std::map<std::string, Eigen::Quaterniond> pose_quaternions_;
 
     // callbacks
+    rclcpp::TimerBase::SharedPtr timer_callback;
     void pose_callback(std::string robot_name, const geometry_msgs::msg::PoseStamped &msg);
     void unsafe_cmd_vel_callback(std::string robot_name, const geometry_msgs::msg::TwistStamped &msg);
 };

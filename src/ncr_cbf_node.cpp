@@ -4,6 +4,8 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
+#include "ncr_cbf/construct_constraints.hpp"
+#include "ncr_cbf/solver_wrapper.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
 #include "geometry_msgs/msg/twist.hpp"
@@ -15,7 +17,8 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     // declare global parameters
     this->declare_parameter("location", rclcpp::ParameterType::PARAMETER_STRING);
     this->declare_parameter("robot_names", rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
-    this->declare_parameter("pose_timout", rclcpp::ParameterType::PARAMETER_DOUBLE);
+    this->declare_parameter("cbf_rate_hz", rclcpp::ParameterType::PARAMETER_INTEGER);
+    this->declare_parameter("pose_timeout_sec", rclcpp::ParameterType::PARAMETER_DOUBLE);
     this->declare_parameter("cmd_vel_timeout_sec", rclcpp::ParameterType::PARAMETER_DOUBLE);
     this->declare_parameter("robot_pair_names", rclcpp::ParameterType::PARAMETER_STRING_ARRAY);
     this->declare_parameter("room_geometry.x_min", rclcpp::ParameterType::PARAMETER_DOUBLE);
@@ -28,6 +31,7 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     // get global parameters
     this->get_parameter("location", location);
     this->get_parameter("robot_names", robot_names);
+    this->get_parameter("cbf_rate_hz", cbf_rate_hz);
     this->get_parameter("pose_timeout_sec", pose_timeout_sec);
     this->get_parameter("cmd_vel_timeout_sec", cmd_vel_timeout_sec);
     this->get_parameter("robot_pair_names", robot_pair_names);
@@ -38,11 +42,20 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     this->get_parameter("room_geometry.z_min", room_geometry.z_min);
     this->get_parameter("room_geometry.z_max", room_geometry.z_max);
 
+    // verify cbf_rate_hz
+    if (!(cbf_rate_hz > 0) || !std::isfinite(cbf_rate_hz))
+    {
+        throw std::invalid_argument("Invalid cbf_rate_hz\n`");
+    }
+
     // init checks
     init_pose_checked_ = false;
+    all_init_poses_recieved_ = false;
+    all_init_unsafe_cmd_vels_recieved_ = false;
     for (auto name : robot_names)
     {
         poses_recieved_.emplace(name, false);
+        unsafe_cmd_vels_recieved_.emplace(name, false);
     }
 
     if (location != "indoor_lab" && location != "autonomy_park")
@@ -124,16 +137,11 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
             safe_cmd_vel_topic, 10);
     }
 
-    // TO-DO: variable storage
-    // vars for timeouts. timeouts should include stale pose data, stale control input data, and stale solved cbf data
-    // need to think about architecture here
-    // pose data comes
-    // control data should go out on timer and return zeros in any situation where it would be unsafe or the data has not completely populated (i.e., no active desired control input for agents or mocap times out)
-    // TODO: Add a per-robot convert_to_body_frame bool in the parameter file; in the timer callback loop, convert the safe velocity to the body frame before publishing when enabled.
-    // should also consider how the bebop modes are handled
-
-    // TO:DO: initialization
-    // need to make sure that all robots are not violating constraints on boot
+    // timer callback
+    timer_callback = create_wall_timer(
+        std::chrono::duration<double>(1.0 / cbf_rate_hz),
+        [this]
+        { cbf_loop(); });
 }
 
 bool NcrCbfNode::check_if_duplicates(std::vector<std::string> input_vector)
@@ -212,8 +220,18 @@ void NcrCbfNode::load_individual_parameters(std::string robot_name, std::size_t 
     // using name and index, append values to each parameter map
     const std::string prefix = "robots." + robot_name + ".";
 
+    // convert_to_body_frame
+    const std::string body_string = prefix + "convert_to_body_frame";
+    this->declare_parameter(body_string, rclcpp::ParameterType::PARAMETER_BOOL);
+    bool body_bool;
+    if (!this->get_parameter(body_string, body_bool))
+    {
+        throw std::invalid_argument("Parameter " + body_string + " undefined or invalid\n");
+    }
+    convert_to_body_frame_bools.emplace(robot_idx, body_bool);
+
     // radius
-    const std::string radius_string = prefix + ".radius";
+    const std::string radius_string = prefix + "radius";
     this->declare_parameter(radius_string, rclcpp::ParameterType::PARAMETER_DOUBLE);
     double robot_radius;
     if (!this->get_parameter(radius_string, robot_radius))
@@ -330,7 +348,7 @@ void NcrCbfNode::publish_zeros(rclcpp::Publisher<geometry_msgs::msg::Twist>::Sha
     safe_cmd_vel_pub->publish(zero_twist);
 }
 
-Eigen::Vector3d convert_to_body_frame(Eigen::Quaterniond quaternion, Eigen::Vector3d world_frame_vel)
+Eigen::Vector3d NcrCbfNode::convert_to_body_frame(Eigen::Quaterniond quaternion, Eigen::Vector3d world_frame_vel)
 {
     quaternion.normalize();
     Eigen::Vector3d body_frame_vel = quaternion.inverse() * world_frame_vel;
@@ -371,7 +389,7 @@ void NcrCbfNode::cbf_loop()
         }
 
         // publish zeros to all and return
-        for (auto robot_name : robot_pair_names)
+        for (auto robot_name : robot_names)
         {
             publish_zeros(safe_cmd_vel_pubs[robot_name]);
         }
@@ -386,16 +404,17 @@ void NcrCbfNode::cbf_loop()
             this->get_parameter("robots." + robot_name + ".room_constraints.enabled", room_bool);
             if (room_bool)
             {
+                const double robot_radius = robot_radii.at(robot_index_lookup.at(robot_name));
                 bool room_check = true;
-                if (positions_[robot_name][0] >= room_geometry.x_max || positions_[robot_name][0] <= room_geometry.x_min)
+                if (positions_[robot_name][0] >= room_geometry.x_max - robot_radius || positions_[robot_name][0] <= room_geometry.x_min + robot_radius)
                 {
                     room_check = false;
                 }
-                if (positions_[robot_name][1] >= room_geometry.y_max || positions_[robot_name][1] <= room_geometry.y_min)
+                if (positions_[robot_name][1] >= room_geometry.y_max - robot_radius || positions_[robot_name][1] <= room_geometry.y_min + robot_radius)
                 {
                     room_check = false;
                 }
-                if (positions_[robot_name][2] >= room_geometry.z_max || positions_[robot_name][2] <= room_geometry.z_min)
+                if (positions_[robot_name][2] >= room_geometry.z_max - robot_radius || positions_[robot_name][2] <= room_geometry.z_min + robot_radius)
                 {
                     room_check = false;
                 }
@@ -428,23 +447,92 @@ void NcrCbfNode::cbf_loop()
             }
         }
 
+        init_pose_checked_ = true;
         // publish zeros to all and return
-        for (auto robot_name : robot_pair_names)
+        for (auto robot_name : robot_names)
         {
             publish_zeros(safe_cmd_vel_pubs[robot_name]);
         }
         return;
     }
 
-    if (init_pose_checked_)
+    if (init_pose_checked_ && all_init_poses_recieved_ && all_init_unsafe_cmd_vels_recieved_)
     {
-        // timeouts first
+        // timeouts first, if one robot is stale send zeros to all
+        for (auto robot_name : robot_names)
+        {
+            // pose
+            if (this->now() - pose_time_stamps_[robot_name] >= rclcpp::Duration::from_seconds(pose_timeout_sec))
+            {
+                RCLCPP_WARN(this->get_logger(), "Stale pose data for %s", robot_name.c_str());
+                for (auto robot_name : robot_names)
+                {
+                    publish_zeros(safe_cmd_vel_pubs[robot_name]);
+                }
+                return;
+            }
+            // cmd_vel
+            if (this->now() - unsafe_cmd_vel_time_stamps_[robot_name] >= rclcpp::Duration::from_seconds(cmd_vel_timeout_sec))
+            {
+                RCLCPP_WARN(this->get_logger(), "Stale cmd_vel data for %s", robot_name.c_str());
+                for (auto robot_name : robot_names)
+                {
+                    publish_zeros(safe_cmd_vel_pubs[robot_name]);
+                }
+                return;
+            }
+        }
 
         // construct global constraints
+        std::map<std::size_t, Eigen::Vector3d> agent_positions;
+        std::map<std::size_t, Eigen::Vector3d> unsafe_linear_velocities;
 
-        // run cbf and ensure no solver errors
+        for (const auto &[robot_name, index] : robot_index_lookup)
+        {
+            agent_positions.emplace(index, positions_.at(robot_name));
+            unsafe_linear_velocities.emplace(index, unsafe_linear_cmd_vels_.at(robot_name));
+        }
+
+        auto constraints = ncr_cbf::constructGlobalConstraints(
+            num_agents, room_agents, saturation_agents, pairwise_pairs,
+            room_geometry, robot_radii, pairwise_safety_buffers,
+            room_kappas, pairwise_kappas, componentwise_vel_bounds,
+            agent_positions);
+
+        auto [safe_linear_velocities, status] =
+            ncr_cbf::solveQP(unsafe_linear_velocities, constraints);
+
+        if (status != ncr_cbf::SolverStatus::SOLVED)
+        {
+            RCLCPP_ERROR(this->get_logger(), "CBF solver failed with status %d; publishing zero velocities", static_cast<int>(status));
+            // publish zeros and return
+            for (auto robot_name : robot_names)
+            {
+                publish_zeros(safe_cmd_vel_pubs[robot_name]);
+            }
+            return;
+        }
 
         // check if convert_to_body_frame and publish safe cmd_vel
+        for (const auto &[robot_name, index] : robot_index_lookup)
+        {
+            Eigen::Vector3d safe_linear_velocity = safe_linear_velocities[index];
+            Eigen::Vector3d safe_angular_velocity = unsafe_angular_cmd_vels_[robot_name]; // passing this through for now
+            if (convert_to_body_frame_bools[index])
+            {
+                safe_linear_velocity = convert_to_body_frame(pose_quaternions_[robot_name], safe_linear_velocity);
+                safe_angular_velocity = convert_to_body_frame(pose_quaternions_[robot_name], safe_angular_velocity);
+            }
+            geometry_msgs::msg::Twist safe_cmd_vel;
+            safe_cmd_vel.linear.x = safe_linear_velocity[0];
+            safe_cmd_vel.linear.y = safe_linear_velocity[1];
+            safe_cmd_vel.linear.z = safe_linear_velocity[2];
+            safe_cmd_vel.angular.x = safe_angular_velocity[0];
+            safe_cmd_vel.angular.y = safe_angular_velocity[1];
+            safe_cmd_vel.angular.z = safe_angular_velocity[2];
+
+            safe_cmd_vel_pubs[robot_name]->publish(safe_cmd_vel);
+        }
     }
 }
 
@@ -460,17 +548,40 @@ void NcrCbfNode::pose_callback(std::string robot_name, const geometry_msgs::msg:
     Eigen::Vector3d agent_position(
         msg.pose.position.x,
         msg.pose.position.y,
+        msg.pose.position.z);
+    Eigen::Quaterniond agent_orientation(
+        msg.pose.orientation.w,
+        msg.pose.orientation.x,
+        msg.pose.orientation.y,
         msg.pose.orientation.z);
     positions_.insert_or_assign(robot_name, agent_position);
+    pose_quaternions_.insert_or_assign(robot_name, agent_orientation);
 }
 
 void NcrCbfNode::unsafe_cmd_vel_callback(std::string robot_name, const geometry_msgs::msg::TwistStamped &msg)
 {
+    if (!all_init_unsafe_cmd_vels_recieved_)
+    {
+        unsafe_cmd_vels_recieved_.insert_or_assign(robot_name, true);
+    }
     rclcpp::Time last_cmd_vel_time = this->now();
     unsafe_cmd_vel_time_stamps_.insert_or_assign(robot_name, last_cmd_vel_time);
-    Eigen::Vector3d agent_unsafe_cmd_vel(
+    Eigen::Vector3d agent_unsafe_linear_cmd_vel(
         msg.twist.linear.x,
         msg.twist.linear.y,
         msg.twist.linear.z);
-    unsafe_cmd_vels_.insert_or_assign(robot_name, agent_unsafe_cmd_vel);
+    Eigen::Vector3d agent_unsafe_angular_cmd_vel(
+        msg.twist.angular.x,
+        msg.twist.angular.y,
+        msg.twist.angular.z);
+    unsafe_linear_cmd_vels_.insert_or_assign(robot_name, agent_unsafe_linear_cmd_vel);
+    unsafe_angular_cmd_vels_.insert_or_assign(robot_name, agent_unsafe_angular_cmd_vel);
+}
+
+int main(int argc, char *argv[])
+{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<NcrCbfNode>());
+    rclcpp::shutdown();
+    return 0;
 }

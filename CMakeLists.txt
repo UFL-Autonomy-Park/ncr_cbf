@@ -9,6 +9,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(proxsuite REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(geometry_msgs REQUIRED)
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
@@ -30,6 +32,30 @@ target_link_libraries(ncr_cbf
     PUBLIC
         Eigen3::Eigen
         proxsuite::proxsuite
+)
+
+add_executable(ncr_cbf_node
+    src/ncr_cbf_node.cpp
+)
+
+target_link_libraries(ncr_cbf_node
+    PRIVATE
+        ncr_cbf
+)
+
+ament_target_dependencies(ncr_cbf_node
+    rclcpp
+    geometry_msgs
+)
+
+install(TARGETS ncr_cbf ncr_cbf_node
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY param/
+    DESTINATION share/${PROJECT_NAME}/param
 )
 
 add_executable(test_room
