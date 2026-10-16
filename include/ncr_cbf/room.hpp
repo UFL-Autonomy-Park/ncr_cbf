@@ -9,6 +9,7 @@ namespace ncr_cbf{
         const RoomGeometry& room_geometry,
         const Eigen::Vector3d& agent_position,
         double robot_radius,
-        double kappa
+        double kappa,
+        const RoomFaces& enabled_faces = all_room_faces
     );
 } // namespace ncr_cbf

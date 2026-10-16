@@ -66,6 +66,25 @@ int main() {
         assert(room_constraints.lower_bounds(idx) < 0.0);
     }
 
+    // A ground robot can report a pose slightly below y_min without a floor
+    // constraint, while the selected walls continue to constrain motion.
+    RoomGeometry ground_room = room_geometry;
+    ground_room.y_min = 0.0;
+    Eigen::Vector3d ground_position(4.0, -0.01, 1.0);
+    RoomFaces ground_faces{true, true, false, true, true, true};
+    auto ground_constraints = constructRoomConstraints(
+        ground_room, ground_position, 0.1, 1.0, ground_faces);
+    assert(ground_constraints.matrix.row(2).isZero());
+    assert(ground_constraints.upper_bounds(2) == 0.0);
+    assert(ground_constraints.upper_bounds(1) > 0.0);
+    assert(ground_constraints.matrix(1, 0) == 1.0);
+    assert(ground_constraints.matrix(3, 1) == 1.0);
+    assert(ground_constraints.upper_bounds(3) > 0.0);
+
+    auto all_faces_constraints = constructRoomConstraints(
+        ground_room, ground_position, 0.1, 1.0);
+    assert(all_faces_constraints.upper_bounds(2) < 0.0);
+
     // passed
     std::cout << "test_room passed\n";
     return 0;

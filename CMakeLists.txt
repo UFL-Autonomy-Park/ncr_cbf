@@ -39,8 +39,7 @@ add_executable(ncr_cbf_node
 )
 
 target_link_libraries(ncr_cbf_node
-    PRIVATE
-        ncr_cbf
+    ncr_cbf
 )
 
 ament_target_dependencies(ncr_cbf_node

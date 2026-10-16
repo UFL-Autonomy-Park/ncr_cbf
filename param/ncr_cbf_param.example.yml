@@ -38,6 +38,7 @@ ncr_cbf_node:
         radius: 0.1
         room_constraints:
           enabled: true
+          enabled_faces: [x_min, x_max, y_max, z_min, z_max]
           kappa: 1.0
         saturation_constraints:
           enabled: true
@@ -51,6 +52,7 @@ ncr_cbf_node:
         radius: 0.1
         room_constraints:
           enabled: true
+          enabled_faces: [x_min, x_max, y_max, z_min, z_max]
           kappa: 1.0
         saturation_constraints:
           enabled: true

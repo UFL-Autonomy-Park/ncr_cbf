@@ -215,6 +215,7 @@ namespace ncr_cbf
             double> &safety_buffers,
         const std::map<
             std::size_t, double> &room_kappas,
+        const std::map<std::size_t, RoomFaces> &room_enabled_faces,
         const std::map<
             std::pair<
                 std::size_t, std::size_t>,
@@ -256,7 +257,8 @@ namespace ncr_cbf
                 room_geometry,
                 agent_positions.at(room_agent),
                 robot_radii.at(room_agent),
-                room_kappas.at(room_agent));
+                room_kappas.at(room_agent),
+                room_enabled_faces.at(room_agent));
             room_constraints.insert({room_agent, room_constraint});
         }
 

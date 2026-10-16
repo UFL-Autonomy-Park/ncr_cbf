@@ -230,6 +230,33 @@ int main() {
         assert(assembled_constraints.lower_bounds(idx) < 0.0);
     }
 
+    // Per-robot face selections must reach the assembled QP rows.
+    RoomGeometry geometry;
+    geometry.x_min = -2.0;
+    geometry.x_max = 2.0;
+    geometry.y_min = 0.0;
+    geometry.y_max = 2.0;
+    geometry.z_min = -2.0;
+    geometry.z_max = 2.0;
+    std::vector<std::size_t> selected_room_agents{0, 1};
+    std::vector<std::size_t> no_saturation_agents;
+    std::vector<std::pair<std::size_t, std::size_t>> no_pairs;
+    std::map<std::size_t, double> radii{{0, 0.1}, {1, 0.1}};
+    std::map<std::size_t, double> kappas{{0, 1.0}, {1, 1.0}};
+    std::map<std::size_t, RoomFaces> faces{
+        {0, all_room_faces},
+        {1, RoomFaces{true, true, false, true, true, true}}};
+    std::map<std::size_t, Eigen::Vector3d> positions{
+        {0, Eigen::Vector3d(0.0, 1.0, 0.0)},
+        {1, Eigen::Vector3d(0.0, -0.01, 0.0)}};
+    auto selected_constraints = constructGlobalConstraints(
+        2, selected_room_agents, no_saturation_agents, no_pairs,
+        geometry, radii, {}, kappas, faces, {}, {}, positions);
+    assert(selected_constraints.matrix(2, 1) == -1.0);
+    assert(selected_constraints.matrix.row(8).isZero());
+    assert(selected_constraints.upper_bounds(8) == 0.0);
+    assert(selected_constraints.matrix(7, 3) == 1.0);
+
     // passed
     std::cout << "test_construct_constraints passed\n";
     return 0;

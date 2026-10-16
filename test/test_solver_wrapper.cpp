@@ -72,6 +72,18 @@ int main() {
     assert(saturation_control_input_diff.norm() < tol);
     assert(saturation_qp_result.second == SolverStatus::SOLVED);
 
+    // A ground pose near the floor must not create an upward velocity demand
+    // when its y_min room face is disabled.
+    RoomGeometry ground_room = simple_room_geometry;
+    ground_room.y_min = 0.0;
+    RoomFaces ground_faces{true, true, false, true, true, true};
+    auto ground_constraints = constructRoomConstraints(
+        ground_room, Eigen::Vector3d(0.0, -0.01, 0.0), 0.1, 1.0, ground_faces);
+    std::map<std::size_t, Eigen::Vector3d> stopped_input{{0, Eigen::Vector3d::Zero()}};
+    auto ground_result = solveQP(stopped_input, ground_constraints);
+    assert(ground_result.second == SolverStatus::SOLVED);
+    assert(ground_result.first.at(0).norm() < tol);
+
     std::cout << "test_solver_wrapper passed\n";
     return 0;
 }

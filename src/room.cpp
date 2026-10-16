@@ -9,7 +9,8 @@ namespace ncr_cbf{
         const RoomGeometry& room_geometry,
         const Eigen::Vector3d& agent_position,
         double robot_radius,
-        double kappa
+        double kappa,
+        const RoomFaces& enabled_faces
     )
     {
         // input validations
@@ -42,15 +43,18 @@ namespace ncr_cbf{
         }
         
         // room size
-        if (2.0*robot_radius >= room_geometry.x_max - room_geometry.x_min) {
+        if (enabled_faces[0] && enabled_faces[1] &&
+            2.0*robot_radius >= room_geometry.x_max - room_geometry.x_min) {
             throw std::invalid_argument("Safe set has zero width or is empty");
         }
 
-        if (2.0*robot_radius >= room_geometry.y_max - room_geometry.y_min) {
+        if (enabled_faces[2] && enabled_faces[3] &&
+            2.0*robot_radius >= room_geometry.y_max - room_geometry.y_min) {
             throw std::invalid_argument("Safe set has zero width or is empty");
         }
 
-        if (2.0*robot_radius >= room_geometry.z_max - room_geometry.z_min) {
+        if (enabled_faces[4] && enabled_faces[5] &&
+            2.0*robot_radius >= room_geometry.z_max - room_geometry.z_min) {
             throw std::invalid_argument("Safe set has zero width or is empty");
         }
 
@@ -86,6 +90,15 @@ namespace ncr_cbf{
             room_geometry.z_max;
         constraints.upper_bounds = kappa*(b-constraints.matrix*agent_position-r);
         constraints.lower_bounds = Eigen::VectorXd::Constant(6,-std::numeric_limits<double>::infinity());
+
+        // Keep the six-row layout expected by assembleConstraints. A disabled
+        // face contributes the always-satisfied inequality 0 <= 0.
+        for (int idx = 0; idx < 6; ++idx) {
+            if (!enabled_faces[idx]) {
+                constraints.matrix.row(idx).setZero();
+                constraints.upper_bounds(idx) = 0.0;
+            }
+        }
 
         // return output
         return constraints;

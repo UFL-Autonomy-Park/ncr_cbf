@@ -5,6 +5,7 @@
 #include <Eigen/Geometry>
 
 #include "ncr_cbf/construct_constraints.hpp"
+#include "ncr_cbf/room.hpp"
 #include "ncr_cbf/solver_wrapper.hpp"
 #include "geometry_msgs/msg/pose_stamped.hpp"
 #include "geometry_msgs/msg/twist_stamped.hpp"
@@ -108,7 +109,8 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
             throw std::invalid_argument("Parameter robots." + robot_name + ".pose_topic" + " undefined or invalid\n");
         }
         pose_subs[robot_name] = create_subscription<geometry_msgs::msg::PoseStamped>(
-            pose_topic, 10, [this, robot_name](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
+            pose_topic, rclcpp::QoS(rclcpp::KeepLast(10)).best_effort(),
+            [this, robot_name](geometry_msgs::msg::PoseStamped::ConstSharedPtr msg)
             { pose_callback(robot_name, *msg); });
 
         // unsafe cmd_vel
@@ -257,6 +259,35 @@ void NcrCbfNode::load_individual_parameters(std::string robot_name, std::size_t 
             throw std::invalid_argument("Parameter " + room_string + ".kappa" + " undefined or invalid\n");
         }
         room_kappas.emplace(robot_idx, room_kappa);
+
+        const std::string faces_parameter = room_string + ".enabled_faces";
+        this->declare_parameter(faces_parameter,
+            std::vector<std::string>{"x_min", "x_max", "y_min", "y_max", "z_min", "z_max"});
+        std::vector<std::string> face_names;
+        this->get_parameter(faces_parameter, face_names);
+        ncr_cbf::RoomFaces faces{};
+        for (const auto &face_name : face_names)
+        {
+            bool recognized = false;
+            for (std::size_t face_idx = 0; face_idx < ncr_cbf::room_face_names.size(); ++face_idx)
+            {
+                if (face_name == ncr_cbf::room_face_names[face_idx])
+                {
+                    if (faces[face_idx])
+                    {
+                        throw std::invalid_argument("Duplicate face " + face_name + " in " + faces_parameter);
+                    }
+                    faces[face_idx] = true;
+                    recognized = true;
+                    break;
+                }
+            }
+            if (!recognized)
+            {
+                throw std::invalid_argument("Unknown face " + face_name + " in " + faces_parameter);
+            }
+        }
+        room_enabled_faces.emplace(robot_idx, faces);
     }
     // saturation constraints
     bool sat_bool{false};
@@ -404,24 +435,20 @@ void NcrCbfNode::cbf_loop()
             this->get_parameter("robots." + robot_name + ".room_constraints.enabled", room_bool);
             if (room_bool)
             {
-                const double robot_radius = robot_radii.at(robot_index_lookup.at(robot_name));
-                bool room_check = true;
-                if (positions_[robot_name][0] >= room_geometry.x_max - robot_radius || positions_[robot_name][0] <= room_geometry.x_min + robot_radius)
+                const std::size_t robot_idx = robot_index_lookup.at(robot_name);
+                const auto &faces = room_enabled_faces.at(robot_idx);
+                const auto room_constraints = ncr_cbf::constructRoomConstraints(
+                    room_geometry, positions_.at(robot_name), robot_radii.at(robot_idx),
+                    room_kappas.at(robot_idx), faces);
+                for (std::size_t face_idx = 0; face_idx < faces.size(); ++face_idx)
                 {
-                    room_check = false;
-                }
-                if (positions_[robot_name][1] >= room_geometry.y_max - robot_radius || positions_[robot_name][1] <= room_geometry.y_min + robot_radius)
-                {
-                    room_check = false;
-                }
-                if (positions_[robot_name][2] >= room_geometry.z_max - robot_radius || positions_[robot_name][2] <= room_geometry.z_min + robot_radius)
-                {
-                    room_check = false;
-                }
-                if (!room_check)
-                {
-                    RCLCPP_FATAL(this->get_logger(), "Room constraints violated on initialization for %s", robot_name.c_str());
-                    throw std::runtime_error("Room constraints violated on initialization for " + robot_name);
+                    if (faces[face_idx] && room_constraints.upper_bounds(face_idx) <= 0.0)
+                    {
+                        RCLCPP_FATAL(this->get_logger(), "Room face %s violated on initialization for %s",
+                            ncr_cbf::room_face_names[face_idx], robot_name.c_str());
+                        throw std::runtime_error("Room face " + std::string(ncr_cbf::room_face_names[face_idx]) +
+                            " violated on initialization for " + robot_name);
+                    }
                 }
             }
         }
@@ -496,7 +523,7 @@ void NcrCbfNode::cbf_loop()
         auto constraints = ncr_cbf::constructGlobalConstraints(
             num_agents, room_agents, saturation_agents, pairwise_pairs,
             room_geometry, robot_radii, pairwise_safety_buffers,
-            room_kappas, pairwise_kappas, componentwise_vel_bounds,
+            room_kappas, room_enabled_faces, pairwise_kappas, componentwise_vel_bounds,
             agent_positions);
 
         auto [safe_linear_velocities, status] =
