@@ -37,9 +37,6 @@ private:
     std::vector<std::size_t> saturation_agents;
     std::vector<std::pair<std::size_t, std::size_t>> pairwise_pairs;
     std::map<
-        std::size_t, bool>
-        convert_to_body_frame_bools;
-    std::map<
         std::size_t, double>
         robot_radii;
     std::map<
