@@ -226,16 +226,6 @@ void NcrCbfNode::load_individual_parameters(std::string robot_name, std::size_t 
     // using name and index, append values to each parameter map
     const std::string prefix = "robots." + robot_name + ".";
 
-    // convert_to_body_frame
-    const std::string body_string = prefix + "convert_to_body_frame";
-    this->declare_parameter(body_string, rclcpp::ParameterType::PARAMETER_BOOL);
-    bool body_bool;
-    if (!this->get_parameter(body_string, body_bool))
-    {
-        throw std::invalid_argument("Parameter " + body_string + " undefined or invalid\n");
-    }
-    convert_to_body_frame_bools.emplace(robot_idx, body_bool);
-
     // radius
     const std::string radius_string = prefix + "radius";
     this->declare_parameter(radius_string, rclcpp::ParameterType::PARAMETER_DOUBLE);
@@ -545,16 +535,11 @@ void NcrCbfNode::cbf_loop()
             return;
         }
 
-        // check if convert_to_body_frame and publish safe cmd_vel
+        // publish safe cmd_vel
         for (const auto &[robot_name, index] : robot_index_lookup)
         {
             Eigen::Vector3d safe_linear_velocity = safe_linear_velocities[index];
             Eigen::Vector3d safe_angular_velocity = unsafe_angular_cmd_vels_[robot_name]; // passing this through for now
-            if (convert_to_body_frame_bools[index])
-            {
-                safe_linear_velocity = convert_to_body_frame(pose_quaternions_[robot_name], safe_linear_velocity);
-                safe_angular_velocity = convert_to_body_frame(pose_quaternions_[robot_name], safe_angular_velocity);
-            }
             geometry_msgs::msg::Twist safe_cmd_vel;
             safe_cmd_vel.linear.x = safe_linear_velocity[0];
             safe_cmd_vel.linear.y = safe_linear_velocity[1];

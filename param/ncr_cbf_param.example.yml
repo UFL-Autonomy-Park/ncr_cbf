@@ -18,7 +18,6 @@ ncr_cbf_node:
 
     robots:
       bebop104:
-        convert_to_body_frame: false
         pose_topic: "/vrpn_mocap/bebop104/pose"
         unsafe_cmd_vel_topic: "/bebop104/cmd_vel_des_unsafe"
         safe_cmd_vel_topic: "/bebop104/cmd_vel_des"
@@ -31,7 +30,6 @@ ncr_cbf_node:
           componentwise_vel_bound: [0.5, 0.5, 0.5]
 
       rosbot05:
-        convert_to_body_frame: true
         pose_topic: "/vrpn_mocap/rosbot05/pose"
         unsafe_cmd_vel_topic: "/rosbot05/cmd_vel_unsafe"
         safe_cmd_vel_topic: "/rosbot05/cmd_vel"
@@ -45,7 +43,6 @@ ncr_cbf_node:
           componentwise_vel_bound: [0.8, 0.8, 0.8]
 
       rosbot10:
-        convert_to_body_frame: true
         pose_topic: "/vrpn_mocap/rosbot10/pose"
         unsafe_cmd_vel_topic: "/rosbot10/cmd_vel_unsafe"
         safe_cmd_vel_topic: "/rosbot10/cmd_vel"
@@ -59,7 +56,6 @@ ncr_cbf_node:
           componentwise_vel_bound: [0.8, 0.8, 0.8]
 
       bebop110:
-        convert_to_body_frame: false
         pose_topic: "/vrpn_mocap/bebop110/pose"
         unsafe_cmd_vel_topic: "/bebop110/cmd_vel_des_unsafe"
         safe_cmd_vel_topic: "/bebop110/cmd_vel_des"
