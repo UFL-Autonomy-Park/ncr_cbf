@@ -49,27 +49,27 @@ namespace ncr_cbf
         {
             if (it->first >= num_agents)
             {
-                throw std::invalid_argument("Agent index " + std::to_string(it->first) + " must be less than " + std::to_string(num_agents) + ".");
+                throw std::invalid_argument("Agent index " + std::to_string(it->first) + " must be less than " + std::to_string(num_agents) + ". To resolve this error, ensure robots in the config are ordered alphanumerically (e.g., bebop112 < bebop114; bebop114 < rosbot05)\n");
             }
 
             if (it->second.matrix.rows() != 6)
             {
-                throw std::invalid_argument("Room constraint with index " + std::to_string(it->first) + " has invalid row dimension.");
+                throw std::invalid_argument("Room constraint with index " + std::to_string(it->first) + " has invalid row dimension.\n");
             }
 
             if (it->second.matrix.cols() != 3)
             {
-                throw std::invalid_argument("Room constraint with index " + std::to_string(it->first) + " has invalid column dimension.");
+                throw std::invalid_argument("Room constraint with index " + std::to_string(it->first) + " has invalid column dimension.\n");
             }
 
             if (it->second.lower_bounds.size() != 6)
             {
-                throw std::invalid_argument("Room constraint with index " + std::to_string(it->first) + " has invalid lower_bounds dimension.");
+                throw std::invalid_argument("Room constraint with index " + std::to_string(it->first) + " has invalid lower_bounds dimension.\n");
             }
 
             if (it->second.upper_bounds.size() != 6)
             {
-                throw std::invalid_argument("Room constraint with index " + std::to_string(it->first) + " has invalid upper_bounds dimension.");
+                throw std::invalid_argument("Room constraint with index " + std::to_string(it->first) + " has invalid upper_bounds dimension.\n");
             }
         }
 
@@ -81,27 +81,27 @@ namespace ncr_cbf
         {
             if (it->first >= num_agents)
             {
-                throw std::invalid_argument("Agent index " + std::to_string(it->first) + " must be less than " + std::to_string(num_agents) + ".");
+                throw std::invalid_argument("Agent index " + std::to_string(it->first) + " must be less than " + std::to_string(num_agents) + ". To resolve this error, ensure robots in the config are ordered alphanumerically (e.g., bebop112 < bebop114; bebop114 < rosbot05)\n");
             }
 
             if (it->second.matrix.rows() != 6)
             {
-                throw std::invalid_argument("Saturation constraint with index " + std::to_string(it->first) + " has invalid row dimension.");
+                throw std::invalid_argument("Saturation constraint with index " + std::to_string(it->first) + " has invalid row dimension.\n");
             }
 
             if (it->second.matrix.cols() != 3)
             {
-                throw std::invalid_argument("Saturation constraint with index " + std::to_string(it->first) + " has invalid column dimension.");
+                throw std::invalid_argument("Saturation constraint with index " + std::to_string(it->first) + " has invalid column dimension.\n");
             }
 
             if (it->second.lower_bounds.size() != 6)
             {
-                throw std::invalid_argument("Saturation constraint with index " + std::to_string(it->first) + " has invalid lower_bounds dimension.");
+                throw std::invalid_argument("Saturation constraint with index " + std::to_string(it->first) + " has invalid lower_bounds dimension.\n");
             }
 
             if (it->second.upper_bounds.size() != 6)
             {
-                throw std::invalid_argument("Saturation constraint with index " + std::to_string(it->first) + " has invalid upper_bounds dimension.");
+                throw std::invalid_argument("Saturation constraint with index " + std::to_string(it->first) + " has invalid upper_bounds dimension.\n");
             }
         }
 
@@ -116,32 +116,32 @@ namespace ncr_cbf
 
             if (it->first.first >= it->first.second)
             {
-                throw std::invalid_argument("Invalid pairwise constraint index (i,j): " + i_j_str + ". Require i < j");
+                throw std::invalid_argument("Invalid pairwise constraint index (i,j): " + i_j_str + ". Require i < j\n");
             }
 
             if (it->first.first >= num_agents || it->first.second >= num_agents)
             {
-                throw std::invalid_argument("Invalid pairwise constraint index (i,j): " + i_j_str + ". Require i,j < num_agents");
+                throw std::invalid_argument("Invalid pairwise constraint index (i,j): " + i_j_str + ". Require i,j < num_agents\n");
             }
 
             if (it->second.matrix.rows() != 1)
             {
-                throw std::invalid_argument("Pairwise constraint with index " + i_j_str + " has invalid row dimension.");
+                throw std::invalid_argument("Pairwise constraint with index " + i_j_str + " has invalid row dimension.\n");
             }
 
             if (it->second.matrix.cols() != 6)
             {
-                throw std::invalid_argument("Pairwise constraint with index " + i_j_str + " has invalid column dimension.");
+                throw std::invalid_argument("Pairwise constraint with index " + i_j_str + " has invalid column dimension.\n");
             }
 
             if (it->second.upper_bounds.size() != 1)
             {
-                throw std::invalid_argument("Pairwise constraint with index " + i_j_str + " has invalid upper_bounds dimension.");
+                throw std::invalid_argument("Pairwise constraint with index " + i_j_str + " has invalid upper_bounds dimension.\n");
             }
 
             if (it->second.lower_bounds.size() != 1)
             {
-                throw std::invalid_argument("Pairwise constraint with index " + i_j_str + " has invalid lower_bounds dimension.");
+                throw std::invalid_argument("Pairwise constraint with index " + i_j_str + " has invalid lower_bounds dimension.\n");
             }
         }
 

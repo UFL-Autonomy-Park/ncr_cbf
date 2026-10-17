@@ -91,8 +91,7 @@ namespace ncr_cbf{
         constraints.upper_bounds = kappa*(b-constraints.matrix*agent_position-r);
         constraints.lower_bounds = Eigen::VectorXd::Constant(6,-std::numeric_limits<double>::infinity());
 
-        // Keep the six-row layout expected by assembleConstraints. A disabled
-        // face contributes the always-satisfied inequality 0 <= 0.
+        // keep the six-row layout expected by assembleConstraints
         for (int idx = 0; idx < 6; ++idx) {
             if (!enabled_faces[idx]) {
                 constraints.matrix.row(idx).setZero();

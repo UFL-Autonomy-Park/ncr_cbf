@@ -59,6 +59,8 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
         unsafe_cmd_vels_recieved_.emplace(name, false);
     }
 
+    // TO-DO: add check while uses known dimensions of autonomy park and indoor lab to rule out misconfigured inputs
+    // e.g., if you put apark bounds in your config for the indoor lab 
     if (location != "indoor_lab" && location != "autonomy_park")
     {
         throw std::invalid_argument("Location must be `indoor_lab` or `autonomy_park\n`");
@@ -86,6 +88,8 @@ NcrCbfNode::NcrCbfNode() : Node("ncr_cbf_node")
     robot_names.erase(names_it, robot_names.end());
 
     // robot names to indices, populate lookup
+    // NOTE: this is where the code is the most inconsistent. I wrote the CBF library to take maps keyed with ints, but then found when writing this node that using the strings was more intuitive
+    // TO-DO: make the CBF library use strings, not ints! 
     for (std::size_t robot_idx = 0; robot_idx < robot_names.size(); ++robot_idx)
     {
         robot_index_lookup.emplace(robot_names[robot_idx], robot_idx);
@@ -475,6 +479,7 @@ void NcrCbfNode::cbf_loop()
         }
 
         init_pose_checked_ = true;
+        RCLCPP_INFO(this->get_logger(), "Initial pose validated against constraints");
         // publish zeros to all and return
         for (auto robot_name : robot_names)
         {

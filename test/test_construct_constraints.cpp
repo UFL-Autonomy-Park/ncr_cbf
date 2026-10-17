@@ -230,7 +230,7 @@ int main() {
         assert(assembled_constraints.lower_bounds(idx) < 0.0);
     }
 
-    // Per-robot face selections must reach the assembled QP rows.
+    // per-robot face selections must reach the assembled QP rows.
     RoomGeometry geometry;
     geometry.x_min = -2.0;
     geometry.x_max = 2.0;
